@@ -403,8 +403,8 @@ static int dleaf2_write(struct btree *btree, tuxkey_t key_bottom,
 	struct extent ex;
 	tuxkey_t limit;
 	block_t end_physical;
-	unsigned need, between, write_segs, rest_segs;
-	int err;
+	unsigned need, orig_need, between, write_segs, rest_segs;
+	int ret, err;
 
 	/* Paranoia checks */
 	assert(key->len == seg_total_count(rq->seg + rq->nr_segs,
@@ -461,8 +461,10 @@ static int dleaf2_write(struct btree *btree, tuxkey_t key_bottom,
 		end_physical = 0;
 	}
 
+recheck:
 	err = 0;
 	rest_segs = 0;
+	orig_need = need;
 	/* Check if we need leaf split */
 	if (need > btree->entries_per_leaf) {
 		/*
@@ -491,6 +493,22 @@ static int dleaf2_write(struct btree *btree, tuxkey_t key_bottom,
 #endif
 		/* Reserve space for temporary hole */
 		rest_segs++;
+	}
+
+	/*
+	 * Allocate blocks to seg after dleaf redirect. With this, our
+	 * allocation order is, bnode => dleaf => data, and we can use
+	 * physical address of dleaf as allocation hint for data blocks.
+	 */
+	ret = rq->seg_alloc(btree, rq, write_segs);
+	if (ret < 0)
+		return ret;
+	/* New segs was added by ->seg_balloc() */
+	if (ret > 0) {
+		/* Adjust number of segs by adding separated numbers */
+		write_segs = rq->max_segs - rq->nr_segs;
+		need = orig_need + ret;
+		goto recheck;
 	}
 
 	/* Expand/shrink space for segs */

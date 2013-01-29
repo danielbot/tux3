@@ -66,6 +66,12 @@ static void __check_seg(struct test_extent *res, block_t index,
 	__check_seg(_res, _index, _seg, _nr_segs);	\
 } while (0)
 
+static int dummy_seg_alloc(struct btree *btree, struct dleaf_req *rq,
+			   int write_segs)
+{
+	return 0;
+}
+
 static struct btree_key_range *
 dleaf2_set_req(struct dleaf_req *rq, block_t index, unsigned count,
 	       struct seg *seg, unsigned max_segs)
@@ -75,6 +81,7 @@ dleaf2_set_req(struct dleaf_req *rq, block_t index, unsigned count,
 	rq->nr_segs = 0;
 	rq->max_segs = max_segs;
 	rq->seg = seg;
+	rq->seg_alloc = dummy_seg_alloc;
 
 	return &rq->key;
 }
